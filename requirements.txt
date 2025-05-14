@@ -4,5 +4,3 @@ langchain
 faiss-cpu
 PyPDF2
 tiktoken
-langchain
-unstructured
