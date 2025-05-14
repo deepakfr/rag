@@ -8,7 +8,7 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
-
+from langchain.schema import Document
 # --- CONFIG ---
 st.set_page_config(page_title="RAG App", layout="wide")
 st.title("📄 RAG App – Ask Questions About Your PDF")
@@ -45,8 +45,9 @@ if uploaded_file:
 
     # Convert PDF to TXT and load
     txt_path = pdf_to_text_file(tmp_pdf_path)
-    loader = TextLoader(txt_path)
-    documents = loader.load()
+    with open(txt_path, "r", encoding="utf-8") as f:
+    text = f.read()
+    documents = [Document(page_content=text)]
 
     # Split text
     splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
