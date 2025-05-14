@@ -4,3 +4,4 @@ matplotlib
 Pillow
 soundfile
 openai
+numpy
