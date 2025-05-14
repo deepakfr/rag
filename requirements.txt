@@ -1,6 +1,5 @@
 streamlit
-langchain 
-openai 
-faiss-cpu 
-tiktoken 
+openai
+langchain
+faiss-cpu
 pypdf
