@@ -1,7 +1,7 @@
 streamlit
 openai
-langchain>=0.1.13
+langchain
+langchain-community
 chromadb
 PyPDF2
 tiktoken
-

@@ -1,26 +1,26 @@
 import streamlit as st
-import os
 import tempfile
 import shutil
 import uuid
+import os
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 from langchain.schema import Document
-from langchain_community.vectorstores import Chroma  # ✅ correct module
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="RAG Q&A", layout="wide")
-st.title("📄 Chat with Your PDF (RAG)")
-st.markdown("Upload a PDF and ask anything. GPT only uses your file to answer.")
+st.title("📄 Ask Questions About Your PDF")
+st.markdown("Upload a PDF and ask GPT anything based on its content.")
 
-# --- Load OpenAI API Key ---
+# --- API KEY ---
 try:
     openai_key = st.secrets["openai"]["api_key"]
 except:
-    st.error("❌ Add your OpenAI API key in `.streamlit/secrets.toml`.")
+    st.error("❌ Add your OpenAI API key in `.streamlit/secrets.toml` or Streamlit Cloud Secrets.")
     st.stop()
 
 # --- PDF to Document ---
@@ -28,9 +28,9 @@ def pdf_to_documents(pdf_path):
     reader = PdfReader(pdf_path)
     text = ""
     for page in reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text + "\n"
+        content = page.extract_text()
+        if content:
+            text += content + "\n"
     return [Document(page_content=text)]
 
 # --- Upload PDF ---
@@ -41,24 +41,17 @@ if uploaded_file:
         tmp.write(uploaded_file.read())
         tmp_path = tmp.name
 
-    docs = pdf_to_documents(tmp_path)
-
-    # Split text
+    documents = pdf_to_documents(tmp_path)
     splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
-    chunks = splitter.split_documents(docs)
+    chunks = splitter.split_documents(documents)
 
-    # Embedding + Chroma vector store
-    persist_dir = f"./chroma_store_{uuid.uuid4().hex[:6]}"
+    # Create Chroma DB
+    persist_dir = f"./chroma_{uuid.uuid4().hex[:6]}"
     embeddings = OpenAIEmbeddings(openai_api_key=openai_key)
-    vectorstore = Chroma.from_documents(
-        chunks,
-        embedding=embeddings,
-        persist_directory=persist_dir
-    )
+    vectorstore = Chroma.from_documents(chunks, embeddings, persist_directory=persist_dir)
     retriever = vectorstore.as_retriever()
 
-    # RAG chain
-    llm = ChatOpenAI(openai_api_key=openai_key, model_name="gpt-3.5-turbo", temperature=0)
+    llm = ChatOpenAI(openai_api_key=openai_key, temperature=0, model_name="gpt-3.5-turbo")
     rag_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
@@ -66,8 +59,8 @@ if uploaded_file:
         return_source_documents=True
     )
 
-    # User input
-    query = st.text_input("🔍 Ask your PDF anything:")
+    # User query
+    query = st.text_input("🔍 Ask something about your PDF:")
 
     if query:
         result = rag_chain({"query": query})
@@ -76,7 +69,7 @@ if uploaded_file:
 
         st.markdown("### 📚 Source Snippets")
         for i, doc in enumerate(result["source_documents"]):
-            st.markdown(f"**Chunk {i+1}:**")
+            st.markdown(f"**Chunk {i+1}**")
             st.write(doc.page_content[:500] + "...")
 
     # Cleanup
