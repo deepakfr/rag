@@ -1,47 +1,56 @@
 import streamlit as st
-import requests
-import time
+from langchain.document_loaders import PyPDFLoader
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.chains import RetrievalQA
+from langchain.chat_models import ChatOpenAI
+import tempfile
+import os
 
-# --- CONFIG ---
-st.set_page_config(page_title="VibeVerse - AI Music Generator", layout="centered")
-st.title("🎧 VibeVerse – Generate Music with AI")
-st.markdown("Enter a musical vibe, and let AI compose it for you using Meta’s MusicGen 🎶")
+# --- PAGE CONFIG ---
+st.set_page_config(page_title="RAG Q&A", layout="wide")
+st.title("📄 RAG App – Ask Questions About Your File")
 
-# --- Get Hugging Face API token ---
-try:
-    api_token = st.secrets["huggingface"]["api_token"]
-except KeyError:
-    st.error("🚨 Hugging Face API token missing. Add it to `.streamlit/secrets.toml`.")
-    st.stop()
+# --- Load API Key ---
+openai_key = st.secrets["openai"]["api_key"]
 
-headers = {
-    "Authorization": f"Bearer {api_token}"
-}
+# --- File Upload ---
+uploaded_file = st.file_uploader("📎 Upload a PDF file", type=["pdf"])
 
-API_URL = "https://api-inference.huggingface.co/models/facebook/musicgen-medium"
+if uploaded_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        tmp_path = tmp_file.name
 
+    # --- Load PDF and chunk ---
+    loader = PyPDFLoader(tmp_path)
+    pages = loader.load()
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    docs = text_splitter.split_documents(pages)
 
-# --- Prompt input ---
-prompt = st.text_input("🎼 Describe the music you want:", placeholder="e.g. Dark techno with ambient pads")
+    # --- Embed and store in FAISS ---
+    embeddings = OpenAIEmbeddings(openai_api_key=openai_key)
+    vectorstore = FAISS.from_documents(docs, embeddings)
 
-if st.button("🎵 Generate Music"):
-    if not prompt.strip():
-        st.warning("Please enter a prompt.")
-    else:
-        st.markdown("⏳ Generating music… please wait 15–30 seconds...")
+    # --- RAG Chain ---
+    llm = ChatOpenAI(openai_api_key=openai_key, model_name="gpt-4", temperature=0)
+    retriever = vectorstore.as_retriever()
+    rag_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=retriever,
+        return_source_documents=True
+    )
 
-        # Send to MusicGen
-        response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
+    # --- User Question ---
+    query = st.text_input("🔍 Ask a question about your PDF")
 
-        if response.status_code == 503:
-            st.warning("⏳ Model is loading… retrying in a few seconds.")
-            time.sleep(10)
-            response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
+    if query:
+        result = rag_chain({"query": query})
+        st.markdown("### 🧠 Answer")
+        st.write(result["result"])
 
-        if response.ok:
-            with open("musicgen_output.wav", "wb") as f:
-                f.write(response.content)
-            st.audio("musicgen_output.wav", format="audio/wav")
-            st.success("✅ Music generated!")
-        else:
-            st.error(f"❌ Failed to generate music: {response.status_code}")
+        with st.expander("📚 Source chunks"):
+            for doc in result["source_documents"]:
+                st.write(doc.page_content[:500] + "...")

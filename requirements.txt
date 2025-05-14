@@ -1,7 +1,6 @@
 streamlit
-numpy
-matplotlib
-Pillow
-soundfile
-openai
-numpy
+langchain 
+openai 
+faiss-cpu 
+tiktoken 
+pypdf
