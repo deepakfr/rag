@@ -1,8 +1,9 @@
 import streamlit as st
+import numpy as np  # ✅ Needed for np.sin, np.cos
 import random
 import openai
 from PIL import Image, ImageEnhance, ImageFilter
-import io
+import re
 
 # --- PAGE CONFIG ---
 st.set_page_config(layout="wide", page_title="VibeVerse", page_icon="🎧")
@@ -24,9 +25,11 @@ def generate_psychedelic_image():
         for j in range(512):
             r = int((i * j) % 255)
             g = int((i ** 2 + j ** 2) % 255)
-            b = int((random.uniform(0.5, 1.5) * (np.sin(i * 0.1) * np.cos(j * 0.1) * 255)) % 255)
+            b = int((np.sin(i * 0.1) * np.cos(j * 0.1) * 255) % 255)
             pixels[i, j] = (r, g, b)
-    img = img.filter(ImageEnhance.Color(img).enhance(2).filter(ImageFilter.GaussianBlur(2)))
+    img = img.filter(ImageFilter.GaussianBlur(radius=2))
+    enhancer = ImageEnhance.Color(img)
+    img = enhancer.enhance(2.0)
     return img
 
 # --- AI Function to Suggest Tracks ---
@@ -47,35 +50,34 @@ Format using Markdown, clean and simple.
                 {"role": "user", "content": prompt}
             ],
             temperature=0.8,
-            max_tokens=600
+            max_tokens=500
         )
-        return response.choices[0].message['content'].strip()
-    except Exception as e:
+        return response.choices[0].message["content"].strip()
+    except Exception:
         return "⚠️ Something went wrong while fetching music suggestions."
 
 # --- Search Input ---
 st.subheader("🧠 Describe your music vibe")
 vibe_input = st.text_input("Type a genre or mood (e.g. 'dark techno', 'psychedelic trance', 'lofi jungle'):")
 
-# --- Generate on Button Click ---
 if st.button("🔮 Find My Vibe"):
     if not vibe_input.strip():
         st.warning("Please describe a vibe to get music suggestions.")
     else:
         st.markdown("🎧 Searching tracks for your vibe...")
-        
-        # Show visual
+
+        # Show psychedelic image
         img = generate_psychedelic_image()
         st.image(img, caption="🌀 Your AI-Generated Visual Vibe", use_column_width=True)
-        
-        # Suggest tracks
-        tracks = suggest_tracks(vibe_input)
-        st.markdown("### 🎶 Recommended Tracks")
-        st.markdown(tracks)
 
-        # Optionally extract and embed first YouTube video
-        import re
-        urls = re.findall(r'(https?://[^\s]+)', tracks)
-        for url in urls[:1]:  # only embed the first one
-            if "youtube" in url:
+        # Suggest tracks
+        tracks_md = suggest_tracks(vibe_input)
+        st.markdown("### 🎶 Recommended Tracks")
+        st.markdown(tracks_md)
+
+        # Embed the first YouTube link (if any)
+        urls = re.findall(r'(https?://[^\s]+)', tracks_md)
+        for url in urls:
+            if "youtube" in url.lower():
                 st.video(url)
+                break
