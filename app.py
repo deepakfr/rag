@@ -1,50 +1,84 @@
 import streamlit as st
-from PyPDF2 import PdfReader
+from langchain.llms import OpenAI
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import DocArrayInMemorySearch
-from langchain.docstore.document import Document
-from langchain.chat_models import ChatOpenAI
+from langchain.vectorstores import Chroma  # using Chroma for in-memory vector store
 from langchain.chains import RetrievalQA
+import pysqlite3
+import sys
 
-# --- CONFIG ---
-st.set_page_config(page_title="PDF Q&A", layout="wide")
-st.title("📄 PDF Q&A App (In-Memory Retriever)")
+# Use pysqlite3 to avoid issues with Chroma on Streamlit
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
-# --- File Upload ---
-uploaded_pdf = st.file_uploader("Upload a PDF document", type="pdf")
-query = st.text_input("Enter your question:", placeholder="Ask something about the document...", disabled=not uploaded_pdf)
+def generate_response(documents, openai_api_key, query_text):
+    """Generate answer from the documents for the given query using LangChain."""
+    # Split documents into chunks (if not already split)
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    docs = text_splitter.create_documents(documents)  # documents is a list of text or pages
+    # Create OpenAI embeddings using the API key
+    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+    # Create the vector store (in-memory) from the document chunks
+    # Clear any Chroma caches to avoid conflicts
+    import chromadb
+    chromadb.api.client.SharedSystemClient.clear_system_cache()
+    vector_store = Chroma.from_documents(docs, embeddings)
+    # Set up retriever and QA chain with OpenAI LLM
+    retriever = vector_store.as_retriever()
+    qa_chain = RetrievalQA.from_chain_type(llm=OpenAI(openai_api_key=openai_api_key),
+                                          chain_type="stuff",
+                                          retriever=retriever)
+    # Run the query through the QA chain
+    result = qa_chain.run(query_text)
+    return result
 
-if uploaded_pdf and query:
-    openai_api_key = st.text_input("OpenAI API Key", type="password", placeholder="sk-...", key="api")
-    if openai_api_key:
-        with st.spinner("Processing your document and generating answer..."):
+# Page title and header
+st.set_page_config(page_title="Ask the PDF")
+st.title("Ask the PDF")
 
-            # Step 1: Extract text from PDF
-            reader = PdfReader(uploaded_pdf)
-            text = ""
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+# File uploader (expecting PDF files)
+uploaded_file = st.file_uploader("Upload a PDF document", type="pdf")
+# Text input for the user’s question (enabled only after a file is uploaded)
+query_text = st.text_input("Enter your question:", 
+                            placeholder="Ask something about the PDF content.", 
+                            disabled=not uploaded_file)
 
-            # Step 2: Chunk the text
-            splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-            chunks = splitter.split_text(text)
-            chunks = [c for c in chunks if c.strip()]  # Remove blanks
+# Prepare a container for the answer
+result = []
 
-            # Step 3: Embed with OpenAI
-            embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-            documents = [Document(page_content=chunk) for chunk in chunks]
-            vectorstore = DocArrayInMemorySearch.from_documents(documents, embeddings)
-            retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+# Form with a submit button to trigger the QA process
+with st.form("query_form", clear_on_submit=True):
+    # **Removed the API key text_input** – we will use st.secrets instead.
+    submitted = st.form_submit_button("Submit", disabled=not (uploaded_file and query_text))
+    if submitted:
+        # Load OpenAI API key from Streamlit secrets (no user input required)
+        openai_api_key = st.secrets["openai"]["api_key"]
+        if not openai_api_key:
+            st.error("OpenAI API key is not configured. Please add it to secrets.")
+        else:
+            with st.spinner("Generating answer..."):
+                # Read and prepare the document text
+                if uploaded_file is not None:
+                    # For PDF: extract text from the file
+                    file_bytes = uploaded_file.read()
+                    # You could use a PDF parser here. For simplicity, assume text extraction:
+                    try:
+                        import PyPDF2
+                        reader = PyPDF2.PdfReader(uploaded_file)
+                        pdf_text = ""
+                        for page in reader.pages:
+                            pdf_text += page.extract_text()  # accumulate text from all pages
+                    except Exception:
+                        pdf_text = file_bytes.decode("latin-1", errors="ignore")  # fallback decoding
+                    documents = [pdf_text]
+                else:
+                    documents = []  # no file
+                
+                # Generate the answer using the helper function
+                response = generate_response(documents, openai_api_key, query_text)
+                result.append(response)
+                # Optionally, you can clear or del the API key variable for safety
+                del openai_api_key
 
-            # Step 4: Ask with GPT
-            llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=openai_api_key)
-            qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
-
-            answer = qa.run(query)
-
-        st.success("✅ Done!")
-        st.markdown("### 💬 Answer")
-        st.write(answer)
+# Display the result if available
+if result:
+    st.info(result[-1])
