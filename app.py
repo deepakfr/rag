@@ -8,8 +8,9 @@ from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 
 # ---------- CONFIG ----------
-st.set_page_config(page_title="PDF Q&A (App-Memory)", layout="wide")
-st.title("📄 Ask Questions About Your PDF — In-Memory Retriever")
+st.set_page_config(page_title="RAG PDF MEMORY Retriever", layout="wide")
+st.title("RAG - The PDF Memory Retriever")
+st.markdown("📄 Ask Questions About Your PDF — In-Memory Retriever")
 
 # ---------- OPENAI KEY ----------
 try:
