@@ -1,7 +1,6 @@
 streamlit
-openai
 langchain
-langchain-community
-chromadb
-PyPDF2
+openai
 tiktoken
+PyPDF2
+docarray
