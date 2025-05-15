@@ -4,11 +4,9 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma  # using Chroma for in-memory vector store
 from langchain.chains import RetrievalQA
-import pysqlite3
 import sys
 
-# Use pysqlite3 to avoid issues with Chroma on Streamlit
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 
 def generate_response(documents, openai_api_key, query_text):
     """Generate answer from the documents for the given query using LangChain."""
