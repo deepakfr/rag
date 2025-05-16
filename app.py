@@ -13,7 +13,7 @@ import time
 # --- Streamlit Config ---
 st.set_page_config(page_title="📄 RAG PDF Memory Retriever", layout="centered")
 st.title("📄 RAG – PDF Memory Retriever")
-st.markdown("Ask questions about your PDF using in-memory vector search + OpenAI ✨")
+st.markdown("Ask questions about your PDF using in-memory vector search & ai assistant✨")
 
 # --- Load API Key Securely ---
 try:
