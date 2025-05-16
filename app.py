@@ -5,7 +5,7 @@ from langchain.document_loaders import PyPDFLoader
 from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
-from openai.error import RateLimitError
+from openai import OpenAIError, RateLimitErro
 import tempfile
 import os
 import time
