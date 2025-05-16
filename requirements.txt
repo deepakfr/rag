@@ -1,6 +1,6 @@
 streamlit
 langchain
-openai
+openai>=1.0.0
 tiktoken
 PyPDF2
 docarray
