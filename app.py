@@ -20,7 +20,8 @@ st.markdown("Ask questions about your PDF using in-memory vector search + OpenAI
 uploaded_file = st.file_uploader("Upload a PDF document", type=["pdf"])
 
 # --- API Key from Secrets ---
-OPENAI_API_KEY = st.secrets["api_key"]
+st.secrets["openai"]["api_key"]
+
 
 
 # --- Retry Wrapper ---
