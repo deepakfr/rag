@@ -1,7 +1,7 @@
 import streamlit as st
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
-from langchain.document_loaders import PyPDFLoader
+from langchain.document_loaders import PyMuPDFLoader
 from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
@@ -45,7 +45,7 @@ if uploaded_file:
             temp_path = tmp_file.name
 
         # Load PDF content
-        loader = PyPDFLoader(temp_path)
+        loader = PyMuPDFLoader(temp_path)
         pages = loader.load()
 
         # Split text
