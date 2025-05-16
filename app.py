@@ -5,10 +5,11 @@ from langchain.document_loaders import PyPDFLoader
 from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
-from openai import OpenAIError, RateLimitErro
+from openai.error import OpenAIError, RateLimitError
 import tempfile
 import os
 import time
+
 
 # --- Streamlit Config ---
 st.set_page_config(page_title="📄 RAG PDF Memory Retriever", layout="centered")
