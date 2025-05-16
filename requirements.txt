@@ -1,6 +1,6 @@
 streamlit
 langchain
-openai>=1.0.0
+openai>=0.27.0,<1.0.0  # for `openai.error.RateLimitError` to be available
 tiktoken
 PyPDF2
 docarray
